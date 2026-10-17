@@ -1,0 +1,271 @@
+# =============================================
+#  C++ (стандартные файлы сборки)
+# =============================================
+
+# Prerequisites
+*.d
+
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Fortran module files
+*.mod
+*.smod
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+
+# =============================================
+#  CMake
+# =============================================
+
+# CMake build directories
+build/
+build-*/
+cmake-build-*/
+out/
+bin/
+lib/
+win-x64/
+
+# CMake files
+CMakeCache.txt
+CMakeFiles/
+CMakeScripts/
+Makefile
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+CTestTestfile.cmake
+_deps/
+
+# CMake user files
+CMakeLists.txt.user
+CMakeUserPresets.json
+
+# =============================================
+#  Conan
+# =============================================
+
+# Conan build and cache
+conandata.yml
+conaninfo.txt
+conanbuildinfo.*
+conanbuild.bat
+conanbuild.sh
+conanrun.bat
+conanrun.sh
+conan_toolchain.cmake
+conan.lock
+*.conan
+*.conan2
+
+# =============================================
+#  Python (виртуальные окружения)
+# =============================================
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+.venv_linux/
+.venv_windows/
+venv_*/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.pyd
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+
+# MyPy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# =============================================
+#  IDE / Editor
+# =============================================
+
+# Visual Studio Code
+.vscode/
+*.code-workspace
+
+# Visual Studio
+*.sln
+*.suo
+*.user
+*.userosscache
+*.sdf
+*.opensdf
+*.opendb
+*.db
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+*.vs/
+.vs/
+
+# CLion
+.idea/
+cmake-build-*/
+
+# Qt Creator
+*.creator
+*.creator.user
+*.files
+*.includes
+*.config
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swo
+*~
+.*.swp
+.*.swo
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+
+# =============================================
+#  Git / Misc
+# =============================================
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Logs
+*.log
+logs/
+*.pid
+*.seed
+*.pid.lock
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+
+# Debug and release folders
+debug/
+release/
+Debug/
+Release/
+x64/
+x86/
+
+# =============================================
+#  Project specific
+# =============================================
+
+# Conan local cache (если вы храните локально)
+.conan/
+.conan2/
+
+# Build output
+bin/
+obj/
+lib/
+*.ilk
+*.pdb
+*.exp
+
+# Profiling
+*.gcda
+*.gcno
+*.gcov
+
+# Testing
+Testing/
+test.log
+*.trs
+*.log
+
+# Backup files
+*.bak
+*.backup
+*.orig
+*.rej
+
+# Local development settings
+/.mcp.json
+/.venv-*/

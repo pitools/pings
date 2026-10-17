@@ -1,0 +1,22 @@
+defaults:
+  reply_timeout_ms: 1000
+  resolve_timeout_ms: 3000
+  payload_size: 32
+  address_family: ipv4
+
+hosts:
+  - name: localhost
+    host: 127.0.0.1
+    enabled: true
+
+  - name: ipv6
+    host: ::1
+    enabled: true
+    ping:
+      address_family: ipv6
+
+  - name: explict-any
+    host: ::1
+    enabled: true
+    ping:
+      address_family: any

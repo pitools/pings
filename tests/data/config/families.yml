@@ -1,0 +1,16 @@
+defaults:
+  address_family: ipv4
+
+hosts:
+  - name: inherited
+    host: 127.0.0.1
+
+  - name: overridden
+    host: "::1"
+    ping:
+      address_family: ipv6
+
+  - name: explicit-any
+    host: "::1"
+    ping:
+      address_family: any

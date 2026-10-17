@@ -1,0 +1,5 @@
+hosts:
+  - name: localhost
+    host: 127.0.0.1
+    ping:
+      address_family: ipv7
