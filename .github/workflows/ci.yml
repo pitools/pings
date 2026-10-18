@@ -127,3 +127,18 @@ jobs:
       - name: Build Windows core
         if: runner.os == 'Windows'
         run: cmake --build out/ci/build --config Release --parallel 2
+
+      - name: Test Linux core
+        if: runner.os == 'Linux'
+        run: >
+          ctest --test-dir out/ci/build/Release
+          --output-on-failure
+          --no-tests=error
+
+      - name: Test Windows core
+        if: runner.os == 'Windows'
+        run: >
+          ctest --test-dir out/ci/build
+          -C Release
+          --output-on-failure
+          --no-tests=error
