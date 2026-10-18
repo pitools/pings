@@ -95,3 +95,35 @@ jobs:
           -c tools.build:jobs=2
           -o "&:with_config=False"
           -o "&:build_apps=False"
+
+      - name: Configure Linux core
+        if: runner.os == 'Linux'
+        env:
+          CC: gcc-14
+          CXX: g++-14
+        run: >
+          cmake -S . -B out/ci/build/Release
+          -G Ninja
+          -DCMAKE_TOOLCHAIN_FILE="$PWD/out/ci/build/Release/generators/conan_toolchain.cmake"
+          -DCMAKE_BUILD_TYPE=Release
+          -DPINGS_BUILD_CONFIG=OFF
+          -DPINGS_BUILD_APPS=OFF
+          -DBUILD_TESTING=ON
+
+      - name: Configure Windows core
+        if: runner.os == 'Windows'
+        run: >
+          cmake -S . -B out/ci/build
+          -G "Visual Studio 18 2026" -A x64
+          -DCMAKE_TOOLCHAIN_FILE="$PWD/out/ci/build/generators/conan_toolchain.cmake"
+          -DPINGS_BUILD_CONFIG=OFF
+          -DPINGS_BUILD_APPS=OFF
+          -DBUILD_TESTING=ON
+
+      - name: Build Linux core
+        if: runner.os == 'Linux'
+        run: cmake --build out/ci/build/Release --parallel 2
+
+      - name: Build Windows core
+        if: runner.os == 'Windows'
+        run: cmake --build out/ci/build --config Release --parallel 2
