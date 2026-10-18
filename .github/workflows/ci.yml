@@ -21,6 +21,17 @@ jobs:
         os: [ubuntu-24.04, windows-2025]
 
     steps:
+      - name: Checkout sources
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Install Conan
+        run: python -m pip install "conan==2.33.0"
+
       - name: Show common tools
         run: |
           cmake --version
@@ -39,3 +50,48 @@ jobs:
           $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
           & $vswhere -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -format json
           cmake --help | Select-String 'Visual Studio'
+
+      - name: Detect Linux Conan profile
+        if: runner.os == 'Linux'
+        env:
+          CC: gcc-14
+          CXX: g++-14
+        run: |
+          conan profile detect
+          conan profile show
+
+      - name: Detect Windows Conan profile
+        if: runner.os == 'Windows'
+        run: |
+          conan profile detect
+          conan profile show
+
+      - name: Install Linux core dependencies
+        if: runner.os == 'Linux'
+        env:
+          CC: gcc-14
+          CXX: g++-14
+        run: >
+          conan install .
+          --output-folder=out/ci
+          --build=missing
+          -pr:h=profiles/linux-gcc
+          -pr:b=default
+          -s:h build_type=Release
+          -c:h tools.cmake.cmaketoolchain:generator=Ninja
+          -c tools.build:jobs=2
+          -o "&:with_config=False"
+          -o "&:build_apps=False"
+
+      - name: Install Windows core dependencies
+        if: runner.os == 'Windows'
+        run: >
+          conan install .
+          --output-folder=out/ci
+          --build=missing
+          -pr:h=profiles/windows-msvc
+          -pr:b=default
+          -s:h build_type=Release
+          -c tools.build:jobs=2
+          -o "&:with_config=False"
+          -o "&:build_apps=False"
