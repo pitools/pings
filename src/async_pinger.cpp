@@ -34,6 +34,7 @@ using namespace utils;
 
 namespace
 {
+#ifdef DEBUG_ENABLED
     std::string packetToHexString(const std::vector<std::uint8_t> &packet, size_t maxBytes)
     {
         std::string result;
@@ -47,6 +48,7 @@ namespace
             result.pop_back();
         return result;
     }
+#endif
 }
 
 namespace pings
