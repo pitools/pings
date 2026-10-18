@@ -12,12 +12,30 @@ permissions:
 
 jobs:
   inspect:
-    name: Inspect environment
-    runs-on: ubuntu-24.04
+    name: Inspect (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2025]
 
     steps:
-      - name: Show runner information
+      - name: Show common tools
         run: |
-          uname -a
           cmake --version
-          python3 --version
+          python --version
+
+      - name: Inspect Linux compiler
+        if: runner.os == 'Linux'
+        run: |
+          g++-14 --version
+          ninja --version
+
+      - name: Inspect Windows toolchain
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          & $vswhere -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -format json
+          cmake --help | Select-String 'Visual Studio'
