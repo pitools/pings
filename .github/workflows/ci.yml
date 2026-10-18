@@ -11,14 +11,22 @@ permissions:
   contents: read
 
 jobs:
-  inspect:
-    name: Inspect (${{ matrix.os }})
+  build:
+    name: Build and test (${{ matrix.os }}, ${{ matrix.variant }})
     runs-on: ${{ matrix.os }}
 
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-24.04, windows-2025]
+        variant: [core, full]
+        include:
+          - variant: core
+            conan_enabled: 'False'
+            cmake_enabled: 'OFF'
+          - variant: full
+            conan_enabled: 'True'
+            cmake_enabled: 'ON'
 
     steps:
       - name: Checkout sources
@@ -37,7 +45,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: conan-cache.tgz
-          key: conan-2.33.0-core-release-v1-${{ matrix.os }}-${{ runner.arch }}-${{ hashFiles('conanfile.py', 'profiles/*') }}
+          key: conan-2.33.0-${{ matrix.variant }}-release-v1-${{ matrix.os }}-${{ runner.arch }}-${{ hashFiles('conanfile.py', 'profiles/*') }}
 
       - name: Import cached Conan packages
         if: steps.conan-cache.outputs.cache-hit == 'true'
@@ -77,7 +85,7 @@ jobs:
           conan profile detect
           conan profile show
 
-      - name: Install Linux core dependencies
+      - name: Install Linux ${{ matrix.variant }} dependencies
         if: runner.os == 'Linux'
         env:
           CC: gcc-14
@@ -91,10 +99,10 @@ jobs:
           -s:h build_type=Release
           -c:h tools.cmake.cmaketoolchain:generator=Ninja
           -c tools.build:jobs=2
-          -o "&:with_config=False"
-          -o "&:build_apps=False"
+          -o "&:with_config=${{ matrix.conan_enabled }}"
+          -o "&:build_apps=${{ matrix.conan_enabled }}"
 
-      - name: Install Windows core dependencies
+      - name: Install Windows ${{ matrix.variant }} dependencies
         if: runner.os == 'Windows'
         run: >
           conan install .
@@ -104,14 +112,14 @@ jobs:
           -pr:b=default
           -s:h build_type=Release
           -c tools.build:jobs=2
-          -o "&:with_config=False"
-          -o "&:build_apps=False"
+          -o "&:with_config=${{ matrix.conan_enabled }}"
+          -o "&:build_apps=${{ matrix.conan_enabled }}"
 
       - name: Export Conan packages for cache
         if: steps.conan-cache.outputs.cache-hit != 'true'
         run: conan cache save "*:*" --file=conan-cache.tgz
 
-      - name: Configure Linux core
+      - name: Configure Linux ${{ matrix.variant }}
         if: runner.os == 'Linux'
         env:
           CC: gcc-14
@@ -121,36 +129,36 @@ jobs:
           -G Ninja
           -DCMAKE_TOOLCHAIN_FILE="$PWD/out/ci/build/Release/generators/conan_toolchain.cmake"
           -DCMAKE_BUILD_TYPE=Release
-          -DPINGS_BUILD_CONFIG=OFF
-          -DPINGS_BUILD_APPS=OFF
+          -DPINGS_BUILD_CONFIG=${{ matrix.cmake_enabled }}
+          -DPINGS_BUILD_APPS=${{ matrix.cmake_enabled }}
           -DBUILD_TESTING=ON
 
-      - name: Configure Windows core
+      - name: Configure Windows ${{ matrix.variant }}
         if: runner.os == 'Windows'
         run: >
           cmake -S . -B out/ci/build
           -G "Visual Studio 18 2026" -A x64
           -DCMAKE_TOOLCHAIN_FILE="$PWD/out/ci/build/generators/conan_toolchain.cmake"
-          -DPINGS_BUILD_CONFIG=OFF
-          -DPINGS_BUILD_APPS=OFF
+          -DPINGS_BUILD_CONFIG=${{ matrix.cmake_enabled }}
+          -DPINGS_BUILD_APPS=${{ matrix.cmake_enabled }}
           -DBUILD_TESTING=ON
 
-      - name: Build Linux core
+      - name: Build Linux ${{ matrix.variant }}
         if: runner.os == 'Linux'
         run: cmake --build out/ci/build/Release --parallel 2
 
-      - name: Build Windows core
+      - name: Build Windows ${{ matrix.variant }}
         if: runner.os == 'Windows'
         run: cmake --build out/ci/build --config Release --parallel 2
 
-      - name: Test Linux core
+      - name: Test Linux ${{ matrix.variant }}
         if: runner.os == 'Linux'
         run: >
           ctest --test-dir out/ci/build/Release
           --output-on-failure
           --no-tests=error
 
-      - name: Test Windows core
+      - name: Test Windows ${{ matrix.variant }}
         if: runner.os == 'Windows'
         run: >
           ctest --test-dir out/ci/build
