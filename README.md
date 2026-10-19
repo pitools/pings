@@ -142,6 +142,17 @@ There is no automatic retry with another address or family.
 A DNS AAAA record does not guarantee that the local machine has working
 IPv6 connectivity.
 
+## Continuous integration
+
+GitHub Actions builds and tests the project on Windows and Linux
+with two configurations:
+
+- Core only: YAML configuration and applications disabled, six tests.
+- Full build: YAML configuration and applications enabled, eight tests.
+
+CI runs deterministic unit tests without raw sockets or network access.
+Conan dependency packages are cached between runs.
+
 ## Current limitations
 
 - No stable installation/export package is provided yet.
@@ -152,7 +163,7 @@ IPv6 connectivity.
 - Repeat statistics cover recorded results, not all traffic over the
   lifetime of a series.
 - macOS support has not been verified.
-- Automated CI is not configured yet.
+- CI currently covers Release builds only.
 - The terminal UI is an experimental prototype and is not connected to ping operations yet.
 
 ## Examples

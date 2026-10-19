@@ -1,0 +1,167 @@
+name: CI
+
+on:
+  push:
+    branches: [main, ci]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build and test (${{ matrix.os }}, ${{ matrix.variant }})
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2025]
+        variant: [core, full]
+        include:
+          - variant: core
+            conan_enabled: 'False'
+            cmake_enabled: 'OFF'
+          - variant: full
+            conan_enabled: 'True'
+            cmake_enabled: 'ON'
+
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Install Conan
+        run: python -m pip install "conan==2.33.0"
+
+      - name: Restore Conan archive
+        id: conan-cache
+        uses: actions/cache@v5
+        with:
+          path: conan-cache.tgz
+          key: conan-2.33.0-${{ matrix.variant }}-release-v1-${{ matrix.os }}-${{ runner.arch }}-${{ hashFiles('conanfile.py', 'profiles/*') }}
+
+      - name: Import cached Conan packages
+        if: steps.conan-cache.outputs.cache-hit == 'true'
+        run: conan cache restore conan-cache.tgz
+
+      - name: Show common tools
+        run: |
+          cmake --version
+          python --version
+
+      - name: Inspect Linux compiler
+        if: runner.os == 'Linux'
+        run: |
+          g++-14 --version
+          ninja --version
+
+      - name: Inspect Windows toolchain
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          & $vswhere -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -format json
+          cmake --help | Select-String 'Visual Studio'
+
+      - name: Detect Linux Conan profile
+        if: runner.os == 'Linux'
+        env:
+          CC: gcc-14
+          CXX: g++-14
+        run: |
+          conan profile detect
+          conan profile show
+
+      - name: Detect Windows Conan profile
+        if: runner.os == 'Windows'
+        run: |
+          conan profile detect
+          conan profile show
+
+      - name: Install Linux ${{ matrix.variant }} dependencies
+        if: runner.os == 'Linux'
+        env:
+          CC: gcc-14
+          CXX: g++-14
+        run: >
+          conan install .
+          --output-folder=out/ci
+          --build=missing
+          -pr:h=profiles/linux-gcc
+          -pr:b=default
+          -s:h build_type=Release
+          -c:h tools.cmake.cmaketoolchain:generator=Ninja
+          -c tools.build:jobs=2
+          -o "&:with_config=${{ matrix.conan_enabled }}"
+          -o "&:build_apps=${{ matrix.conan_enabled }}"
+
+      - name: Install Windows ${{ matrix.variant }} dependencies
+        if: runner.os == 'Windows'
+        run: >
+          conan install .
+          --output-folder=out/ci
+          --build=missing
+          -pr:h=profiles/windows-msvc
+          -pr:b=default
+          -s:h build_type=Release
+          -c tools.build:jobs=2
+          -o "&:with_config=${{ matrix.conan_enabled }}"
+          -o "&:build_apps=${{ matrix.conan_enabled }}"
+
+      - name: Export Conan packages for cache
+        if: steps.conan-cache.outputs.cache-hit != 'true'
+        run: conan cache save "*:*" --file=conan-cache.tgz
+
+      - name: Configure Linux ${{ matrix.variant }}
+        if: runner.os == 'Linux'
+        env:
+          CC: gcc-14
+          CXX: g++-14
+        run: >
+          cmake -S . -B out/ci/build/Release
+          -G Ninja
+          -DCMAKE_TOOLCHAIN_FILE="$PWD/out/ci/build/Release/generators/conan_toolchain.cmake"
+          -DCMAKE_BUILD_TYPE=Release
+          -DPINGS_BUILD_CONFIG=${{ matrix.cmake_enabled }}
+          -DPINGS_BUILD_APPS=${{ matrix.cmake_enabled }}
+          -DBUILD_TESTING=ON
+
+      - name: Configure Windows ${{ matrix.variant }}
+        if: runner.os == 'Windows'
+        run: >
+          cmake -S . -B out/ci/build
+          -G "Visual Studio 18 2026" -A x64
+          -DCMAKE_TOOLCHAIN_FILE="$PWD/out/ci/build/generators/conan_toolchain.cmake"
+          -DPINGS_BUILD_CONFIG=${{ matrix.cmake_enabled }}
+          -DPINGS_BUILD_APPS=${{ matrix.cmake_enabled }}
+          -DBUILD_TESTING=ON
+
+      - name: Build Linux ${{ matrix.variant }}
+        if: runner.os == 'Linux'
+        run: cmake --build out/ci/build/Release --parallel 2
+
+      - name: Build Windows ${{ matrix.variant }}
+        if: runner.os == 'Windows'
+        run: cmake --build out/ci/build --config Release --parallel 2
+
+      - name: Test Linux ${{ matrix.variant }}
+        if: runner.os == 'Linux'
+        run: >
+          ctest --test-dir out/ci/build/Release
+          --output-on-failure
+          --no-tests=error
+
+      - name: Test Windows ${{ matrix.variant }}
+        if: runner.os == 'Windows'
+        run: >
+          ctest --test-dir out/ci/build
+          -C Release
+          --output-on-failure
+          --no-tests=error
