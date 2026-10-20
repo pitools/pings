@@ -293,6 +293,16 @@ if(BUILD_TESTING)
         tests/repeat_statistics_test.cpp
     )
 
+    pings_add_test(
+        pings_lifecycle_test
+        pinger_lifecycle
+        tests/pinger_lifecycle_test.cpp
+    )
+
+    set_tests_properties(pinger_lifecycle PROPERTIES
+        TIMEOUT 10
+    )
+
     target_include_directories(pings_repeat_statistics_test PRIVATE
         "${PROJECT_SOURCE_DIR}/src/detail"
     )

@@ -96,6 +96,7 @@ namespace pings
         void sendRequest(std::shared_ptr<detail::PingSession> session);
         void sendRequestV4(std::shared_ptr<detail::PingSession> session);
         void sendRequestV6(std::shared_ptr<detail::PingSession> session);
+        boost::system::error_code ensureSocketV4();
         boost::system::error_code ensureSocketV6();
         void startWaitForReply(std::shared_ptr<detail::PingSession> session);
         // Start an IPv4 receive unless one is already pending.
