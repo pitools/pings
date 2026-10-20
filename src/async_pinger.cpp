@@ -60,34 +60,7 @@ namespace pings
               static_cast<std::uint16_t>(
                   GET_PROCESS_ID() & 0xFFFF)),
           state_(detail::PingerState::Idle)
-    {
-        // Open IPv4 eagerly so construction reports socket setup failures
-        boost::system::error_code ec;
-        socket_.open(boost::asio::ip::icmp::v4(), ec);
-        if (ec)
-        {
-            DEBUG_ERROR("Socket open failed: {}", ec.message());
-            DEBUG_WARN("Raw ICMP socket may require elevated privileges");
-
-            throw boost::system::system_error(ec);
-        }
-
-        // Bind to the IPv4 wildcard address before starting receive operations
-        boost::asio::ip::icmp::endpoint localEndpoint(
-            boost::asio::ip::address_v4::any(), 0);
-
-        socket_.bind(localEndpoint, ec);
-
-        if (ec)
-        {
-            DEBUG_ERROR(
-                "Socket bind failed: {} ({})",
-                ec.message(),
-                ec.value());
-            throw boost::system::system_error(ec);
-
-        }
-    }
+    {}
 
     AsyncPinger::~AsyncPinger()
     {
@@ -851,6 +824,18 @@ namespace pings
 
     void AsyncPinger::sendRequestV4(std::shared_ptr<detail::PingSession> session)
     {
+        const auto socketError = ensureSocketV4();
+
+        if (socketError)
+        {
+            completeSession(
+                session->sequenceNumber,
+                PingStatus::SendError,
+                std::chrono::milliseconds{0},
+                socketError);
+            return;
+        }
+
         const std::size_t payloadSize = session->options.payloadSize;
 
         const std::size_t packetSize = icmp::EchoHeaderSize + payloadSize;
@@ -1106,6 +1091,37 @@ namespace pings
         }
     }
 
+    // Open IPv4 only when an operation needs to send a request.
+    boost::system::error_code AsyncPinger::ensureSocketV4()
+    {
+        if (socket_.is_open())
+        {
+            return {};
+        }
+
+        boost::system::error_code ec;
+        socket_.open(boost::asio::ip::icmp::v4(), ec);
+
+        if (ec)
+        {
+            return ec;
+        }
+
+        const boost::asio::ip::icmp::endpoint localEndpoint(
+            boost::asio::ip::address_v4::any(), 0);
+
+        socket_.bind(localEndpoint, ec);
+
+        if (ec)
+        {
+            boost::system::error_code closeError;
+            socket_.close(closeError);
+            return ec;
+        }
+
+        return {};
+    }
+
     // Open IPv6 on demand so IPv4-only use does not require IPv6 socket setup.
     boost::system::error_code AsyncPinger::ensureSocketV6()
     {
@@ -1253,7 +1269,10 @@ namespace pings
         }
 
         boost::system::error_code ec;
-        socket_.cancel(ec);
+        if (socket_.is_open())
+        {
+            socket_.cancel(ec);
+        }
 
         if (socketV6_.is_open())
         {

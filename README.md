@@ -68,6 +68,11 @@ The example uses raw sockets. Running ping operations requires appropriate
 OS privileges: an elevated process on Windows, or root/CAP_NET_RAW on Linux.
 The unit tests do not require raw-socket privileges.
 
+IPv4 and IPv6 sockets are opened on demand when sending a request.
+Creating an AsyncPinger does not open raw sockets. Socket open or bind
+failures are reported asynchronously as SendError, with the system
+error available in PingResult::error.
+
 ## Build requirements
 
 - A C++20 compiler.
@@ -127,8 +132,8 @@ another one.
 Conan options select dependencies. CMake options select build targets.
 Keep them consistent when invoking CMake directly.
 
-The core-only build registers six tests. Enabling configuration adds two
-more tests.
+The core-only build registers seven tests. Enabling configuration adds
+two more tests.
 
 ## Address-family policy
 
@@ -147,8 +152,8 @@ IPv6 connectivity.
 GitHub Actions builds and tests the project on Windows and Linux
 with two configurations:
 
-- Core only: YAML configuration and applications disabled, six tests.
-- Full build: YAML configuration and applications enabled, eight tests.
+- Core only: YAML configuration and applications disabled, seven tests.
+- Full build: YAML configuration and applications enabled, nine tests.
 
 CI runs deterministic unit tests without raw sockets or network access.
 Conan dependency packages are cached between runs.
