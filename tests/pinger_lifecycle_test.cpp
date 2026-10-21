@@ -66,9 +66,8 @@ namespace
 
         expect(callbackCount == 2, "new work completes after restart");
 
-                expect(
-            lastStatus == pings::PingStatus::InvalidOptions,
-            "second operation reports invalid options");
+        expect(lastStatus == pings::PingStatus::InvalidOptions,
+               "second operation reports invalid options");
         expect(!requestSent, "second operation sends no request");
 
         pinger->run();
@@ -171,6 +170,51 @@ namespace
             "empty handle cancellation produces no callbacks");
     }
 
+    void testCallbackExceptionIsolation()
+    {
+        using namespace std::chrono_literals;
+
+        auto pinger = pings::AsyncPinger::create();
+
+        pings::PingOptions options{};
+        options.replyTimeout = -1ms;
+
+        int throwingCallbacks = 0;
+        int followingCallbacks = 0;
+        auto followingStatus = pings::PingStatus::InternalError;
+
+        [[maybe_unused]] auto first = pinger->pingAsync(
+            "127.0.0.1",
+            options,
+            [&](const pings::PingResult &)
+            {
+                ++throwingCallbacks;
+                throw std::runtime_error{"Expected callback failure"};
+            });
+
+        [[maybe_unused]] auto second = pinger->pingAsync(
+            "127.0.0.1",
+            options,
+            [&](const pings::PingResult &result)
+            {
+                ++followingCallbacks;
+                followingStatus = result.status;
+            });
+
+        pinger->run();
+
+        expect(throwingCallbacks == 1, "throwing callback runs once");
+        expect(followingCallbacks == 1, "next callback survives exception");
+        expect(
+            followingStatus == pings::PingStatus::InvalidOptions,
+            "next callback receives its result");
+
+        pinger->run();
+
+        expect(throwingCallbacks == 1, "throwing callback is not retried");
+        expect(followingCallbacks == 1, "following callback is not repeated");
+    }
+
     void runScenario(std::string_view name, void (*scenario)())
     {
         const int failuresBefore = failures;
@@ -212,6 +256,10 @@ int main()
     runScenario(
         "late and empty handle cancellation",
         testLateAndEmptyHandleCancellation);
+
+    runScenario(
+        "callback exception isolation",
+        testCallbackExceptionIsolation);
 
     return failures == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 }
