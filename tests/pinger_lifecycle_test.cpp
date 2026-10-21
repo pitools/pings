@@ -19,14 +19,11 @@ namespace
             std::cerr << "FAIL: " << name << '\n';
         }
     }
-}
 
-int main()
-{
-    using namespace std::chrono_literals;
-
-    try
+    void testDeferredCallbacksAndRestart()
     {
+        using namespace std::chrono_literals;
+
         auto pinger = pings::AsyncPinger::create();
 
         pings::PingOptions options{};
@@ -68,7 +65,8 @@ int main()
         pinger->run();
 
         expect(callbackCount == 2, "new work completes after restart");
-        expect(
+
+                expect(
             lastStatus == pings::PingStatus::InvalidOptions,
             "second operation reports invalid options");
         expect(!requestSent, "second operation sends no request");
@@ -76,6 +74,22 @@ int main()
         pinger->run();
 
         expect(callbackCount == 2, "completed callbacks are not repeated");
+    }
+
+    void testStopAndRejection()
+    {
+        auto pinger = pings::AsyncPinger::create();
+
+        int callbackCount = 0;
+        auto lastStatus = pings::PingStatus::InternalError;
+        bool requestSent = true;
+
+        const auto callback = [&](const pings::PingResult &result)
+        {
+            ++callbackCount;
+            lastStatus = result.status;
+            requestSent = result.requestSent;
+        };
 
         // Stopped run produces no extra callbacks
         pinger->stop();
@@ -83,11 +97,11 @@ int main()
         [[maybe_unused]] auto pending = pinger->pingAsync(
             "127.0.0.1", pings::PingOptions{}, callback);
 
-        expect(callbackCount == 2, "stop completion is deferred");
+        expect(callbackCount == 0, "stop completion is deferred");
 
         pinger->run();
 
-        expect(callbackCount == 3, "stop completes pending operation once");
+        expect(callbackCount == 1, "stop completes pending operation once");
         expect(
             lastStatus == pings::PingStatus::Stopped,
             "pending operation reports stopped");
@@ -109,8 +123,11 @@ int main()
 
         pinger->run();
 
-        expect(callbackCount == 3, "stopped run produces no extra callbacks");
+        expect(callbackCount == 1, "stopped run produces no extra callbacks");
+    }
 
+    void testLateAndEmptyHandleCancellation()
+    {
         // Late repeated cancellation produces no extra callbacks
         auto cancellationPinger = pings::AsyncPinger::create();
         int cancellationCallbacks = 0;
@@ -153,16 +170,48 @@ int main()
             cancellationCallbacks == 1,
             "empty handle cancellation produces no callbacks");
     }
-    catch (const std::exception &error)
+
+    void runScenario(std::string_view name, void (*scenario)())
     {
-        ++failures;
-        std::cerr << "Unexpected exception: " << error.what() << '\n';
+        const int failuresBefore = failures;
+
+        try
+        {
+            scenario();
+        }
+        catch (const std::exception &error)
+        {
+            ++failures;
+            std::cerr << "FAIL: " << name
+                      << ": unexpected exception: "
+                      << error.what() << '\n';
+        }
+        catch (...)
+        {
+            ++failures;
+            std::cerr << "FAIL: " << name
+                      << ": unexpected non-standard exception\n";
+        }
+
+        std::cout
+            << (failures == failuresBefore ? "PASS: " : "FAIL: ")
+            << name << '\n';
     }
-    catch (...)
-    {
-        ++failures;
-        std::cerr << "Unexpected non-standard exception\n";
-    }
+}
+
+int main()
+{
+    runScenario(
+        "deferred callbacks and restart",
+        testDeferredCallbacksAndRestart);
+
+    runScenario(
+        "stop and rejection",
+        testStopAndRejection);
+
+    runScenario(
+        "late and empty handle cancellation",
+        testLateAndEmptyHandleCancellation);
 
     return failures == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 }
