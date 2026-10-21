@@ -215,6 +215,63 @@ namespace
         expect(followingCallbacks == 1, "following callback is not repeated");
     }
 
+    void testSessionCallbackExceptionIsolation()
+    {
+        auto pinger = pings::AsyncPinger::create();
+
+        pings::PingOptions options{};
+        options.addressFamily = pings::AddressFamily::IPv6;
+
+        int throwingCallbacks = 0;
+        int followingCallbacks = 0;
+        auto throwingStatus = pings::PingStatus::InternalError;
+        auto followingStatus = pings::PingStatus::InternalError;
+
+        [[maybe_unused]] auto first = pinger->pingAsync(
+            "127.0.0.1",
+            options,
+            [&](const pings::PingResult &result)
+            {
+                ++throwingCallbacks;
+                throwingStatus = result.status;
+                throw std::runtime_error{"Expected session callback failure"};
+            });
+
+        [[maybe_unused]] auto second = pinger->pingAsync(
+            "127.0.0.1",
+            options,
+            [&](const pings::PingResult &result)
+            {
+                ++followingCallbacks;
+                followingStatus = result.status;
+            });
+
+        expect(throwingCallbacks == 0, "session callback is deferred");
+        expect(followingCallbacks == 0, "following session callback is deferred");
+
+        pinger->run();
+
+        expect(throwingCallbacks == 1, "throwing session callback runs once");
+        expect(
+            throwingStatus == pings::PingStatus::InvalidOptions,
+            "throwing session reports family mismatch");
+        expect(
+            followingCallbacks == 1,
+            "next session completes despite callback exception");
+        expect(
+            followingStatus == pings::PingStatus::InvalidOptions,
+            "following session reports family mismatch");
+
+        pinger->run();
+
+        expect(
+            throwingCallbacks == 1,
+            "throwing session callback is not retried");
+        expect(
+            followingCallbacks == 1,
+            "following session callback is not repeated");
+    }
+
     void runScenario(std::string_view name, void (*scenario)())
     {
         const int failuresBefore = failures;
@@ -260,6 +317,10 @@ int main()
     runScenario(
         "callback exception isolation",
         testCallbackExceptionIsolation);
+
+    runScenario(
+        "session callback exception isolation",
+        testSessionCallbackExceptionIsolation);
 
     return failures == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 }
