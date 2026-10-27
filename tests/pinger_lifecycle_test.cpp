@@ -272,6 +272,61 @@ namespace
             "following session callback is not repeated");
     }
 
+    void testRepeatedStopWithCallbackException()
+    {
+        auto pinger = pings::AsyncPinger::create();
+
+        int throwingCallbacks = 0;
+        int followingCallbacks = 0;
+        auto throwingStatus = pings::PingStatus::InternalError;
+        auto followingStatus = pings::PingStatus::InternalError;
+        bool anyRequestSent = false;
+
+        pinger->stop();
+        pinger->stop();
+
+        [[maybe_unused]] auto first = pinger->pingAsync(
+            "127.0.0.1",
+            pings::PingOptions{},
+            [&](const pings::PingResult &result)
+            {
+                ++throwingCallbacks;
+                throwingStatus = result.status;
+                anyRequestSent = anyRequestSent || result.requestSent;
+                throw std::runtime_error{"Expected stop callback failure"};
+            });
+
+        [[maybe_unused]] auto second = pinger->pingAsync(
+            "127.0.0.1",
+            pings::PingOptions{},
+            [&](const pings::PingResult &result)
+            {
+                ++followingCallbacks;
+                followingStatus = result.status;
+                anyRequestSent = anyRequestSent || result.requestSent;
+            });
+
+        expect(throwingCallbacks == 0, "throwing stop callback is deferred");
+        expect(followingCallbacks == 0, "following stop callback is deferred");
+
+        pinger->run();
+
+        expect(throwingCallbacks == 1, "throwing stop callback runs once");
+        expect(followingCallbacks == 1, "other session completes during stop");
+        expect(
+            throwingStatus == pings::PingStatus::Stopped,
+            "throwing callback receives stopped");
+        expect(
+            followingStatus == pings::PingStatus::Stopped,
+            "other callback receives stopped");
+        expect(!anyRequestSent, "stop prevents both requests from being sent");
+
+        pinger->run();
+
+        expect(throwingCallbacks == 1, "throwing stop callback is not repeated");
+        expect(followingCallbacks == 1, "other stop callback is not repeated");
+    }
+
     void runScenario(std::string_view name, void (*scenario)())
     {
         const int failuresBefore = failures;
@@ -321,6 +376,10 @@ int main()
     runScenario(
         "session callback exception isolation",
         testSessionCallbackExceptionIsolation);
+
+    runScenario(
+        "repeated stop with callback exception",
+        testRepeatedStopWithCallbackException);
 
     return failures == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
 }
