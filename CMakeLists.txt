@@ -303,6 +303,16 @@ if(BUILD_TESTING)
         TIMEOUT 10
     )
 
+    pings_add_test(
+        pings_batch_api_test
+        batch_api
+        tests/batch_api_test.cpp
+    )
+
+    set_tests_properties(batch_api PROPERTIES
+        TIMEOUT 10
+    )
+
     target_include_directories(pings_repeat_statistics_test PRIVATE
         "${PROJECT_SOURCE_DIR}/src/detail"
     )
