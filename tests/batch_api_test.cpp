@@ -1,7 +1,9 @@
+#include <chrono>
 #include <cstdlib>
 #include <exception>
 #include <iostream>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include <pings/async_pinger.hpp>
@@ -53,6 +55,72 @@ namespace
         expect(completionCallbacks == 1, "empty batch completion is not repeated");
         expect(progressCallbacks == 0, "empty batch progress remains absent");
     }
+
+    void testInvalidOptionsBatch()
+    {
+        using namespace std::chrono_literals;
+
+        auto pinger = pings::AsyncPinger::create();
+
+        pings::PingOptions options{};
+        options.replyTimeout = -1ms;
+
+        const std::vector<pings::PingTarget> targets{
+            {"127.0.0.1", options},
+            {"::1", options},
+            {"127.0.0.2", options},
+        };
+
+        std::vector<std::pair<std::size_t, std::size_t>> progress;
+        std::vector<pings::PingResult> results;
+        int completionCallbacks = 0;
+        std::size_t progressAtCompletion = 0;
+
+        [[maybe_unused]] auto handle = pinger->pingBatch(
+            targets,
+            [&](std::size_t completed, std::size_t total)
+            {
+                progress.emplace_back(completed, total);
+            },
+            [&](const std::vector<pings::PingResult> &batchResults)
+            {
+                ++completionCallbacks;
+                results = batchResults;
+                progressAtCompletion = progress.size();
+            });
+
+        expect(progress.empty(), "batch progress is deferred");
+        expect(completionCallbacks == 0, "batch completion is deferred");
+
+        pinger->run();
+
+        const std::vector<std::pair<std::size_t, std::size_t>>
+            expectedProgress{{1, 3}, {2, 3}, {3, 3}};
+
+        expect(progress == expectedProgress, "progress counts each target");
+        expect(completionCallbacks == 1, "batch completes exactly once");
+        expect(progressAtCompletion == 3, "final progress precedes completion");
+        expect(results.size() == targets.size(), "one result per target");
+
+        if (results.size() == targets.size())
+        {
+            for (std::size_t i = 0; i < targets.size(); ++i)
+            {
+                expect(
+                    results[i].host == targets[i].host,
+                    "result host matches input position");
+                expect(
+                    results[i].status == pings::PingStatus::InvalidOptions,
+                    "each result reports invalid options");
+                expect(!results[i].requestSent, "invalid target sends no request");
+            }
+        }
+
+        pinger->run();
+
+        expect(completionCallbacks == 1, "batch completion is not repeated");
+        expect(progress == expectedProgress, "batch progress is not repeated");
+    }
 }
 
 int main()
@@ -60,6 +128,7 @@ int main()
     try
     {
         testEmptyBatch();
+        testInvalidOptionsBatch();
     }
     catch (const std::exception &error)
     {
