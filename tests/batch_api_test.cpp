@@ -189,6 +189,71 @@ namespace
         expect(progress == expectedProgress, "throwing progress is not repeated");
         expect(completionCallbacks == 1, "completion is not repeated");
     }
+
+    void testCompletionCallbackExceptionIsolation()
+    {
+        using namespace std::chrono_literals;
+
+        auto pinger = pings::AsyncPinger::create();
+
+        pings::PingOptions options{};
+        options.replyTimeout = -1ms;
+
+        int throwingCallbacks = 0;
+        int followingCallbacks = 0;
+        std::vector<pings::PingResult> firstResults;
+        std::vector<pings::PingResult> secondResults;
+
+        [[maybe_unused]] auto first = pinger->pingBatch(
+            std::vector<pings::PingTarget>{{"127.0.0.1", options}},
+            [&](const std::vector<pings::PingResult> &results)
+            {
+                ++throwingCallbacks;
+                firstResults = results;
+                throw std::runtime_error{"Expected batch completion failure"};
+            });
+
+        [[maybe_unused]] auto second = pinger->pingBatch(
+            std::vector<pings::PingTarget>{{"127.0.0.2", options}},
+            [&](const std::vector<pings::PingResult> &results)
+            {
+                ++followingCallbacks;
+                secondResults = results;
+            });
+
+        expect(throwingCallbacks == 0, "throwing completion is deferred");
+        expect(followingCallbacks == 0, "following completion is deferred");
+
+        pinger->run();
+
+        expect(throwingCallbacks == 1, "throwing completion runs once");
+        expect(followingCallbacks == 1, "next batch survives completion exception");
+        expect(firstResults.size() == 1, "throwing completion receives result");
+        expect(secondResults.size() == 1, "following completion receives result");
+
+        if (firstResults.size() == 1)
+        {
+            expect(firstResults[0].host == "127.0.0.1", "first batch host");
+            expect(
+                firstResults[0].status == pings::PingStatus::InvalidOptions,
+                "first batch status");
+            expect(!firstResults[0].requestSent, "first batch sends no request");
+        }
+
+        if (secondResults.size() == 1)
+        {
+            expect(secondResults[0].host == "127.0.0.2", "second batch host");
+            expect(
+                secondResults[0].status == pings::PingStatus::InvalidOptions,
+                "second batch status");
+            expect(!secondResults[0].requestSent, "second batch sends no request");
+        }
+
+        pinger->run();
+
+        expect(throwingCallbacks == 1, "throwing completion is not retried");
+        expect(followingCallbacks == 1, "following completion is not repeated");
+    }
 }
 
 int main()
@@ -198,6 +263,7 @@ int main()
         testEmptyBatch();
         testInvalidOptionsBatch();
         testProgressCallbackExceptionIsolation();
+        testCompletionCallbackExceptionIsolation();
     }
     catch (const std::exception &error)
     {
