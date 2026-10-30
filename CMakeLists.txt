@@ -313,6 +313,20 @@ if(BUILD_TESTING)
         TIMEOUT 10
     )
 
+    pings_add_test(
+        pings_batch_state_test
+        batch_state
+        tests/batch_state_test.cpp
+    )
+
+    target_include_directories(pings_batch_state_test PRIVATE
+        "${PROJECT_SOURCE_DIR}/src/detail"
+    )
+
+    set_tests_properties(batch_state PROPERTIES
+        TIMEOUT 10
+    )
+
     target_include_directories(pings_repeat_statistics_test PRIVATE
         "${PROJECT_SOURCE_DIR}/src/detail"
     )
