@@ -2,6 +2,7 @@
 #include <cstdlib>
 #include <exception>
 #include <iostream>
+#include <stdexcept>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -121,6 +122,73 @@ namespace
         expect(completionCallbacks == 1, "batch completion is not repeated");
         expect(progress == expectedProgress, "batch progress is not repeated");
     }
+
+    void testProgressCallbackExceptionIsolation()
+    {
+        using namespace std::chrono_literals;
+
+        auto pinger = pings::AsyncPinger::create();
+
+        pings::PingOptions options{};
+        options.replyTimeout = -1ms;
+
+        const std::vector<pings::PingTarget> targets{
+            {"127.0.0.1", options},
+            {"::1", options},
+            {"127.0.0.2", options},
+        };
+
+        std::vector<std::pair<std::size_t, std::size_t>> progress;
+        std::vector<pings::PingResult> results;
+        int completionCallbacks = 0;
+        std::size_t progressAtCompletion = 0;
+
+        [[maybe_unused]] auto handle = pinger->pingBatch(
+            targets,
+            [&](std::size_t completed, std::size_t total)
+            {
+                progress.emplace_back(completed, total);
+                throw std::runtime_error{"Expected progress callback failure"};
+            },
+            [&](const std::vector<pings::PingResult> &batchResults)
+            {
+                ++completionCallbacks;
+                results = batchResults;
+                progressAtCompletion = progress.size();
+            });
+
+        expect(progress.empty(), "throwing progress is deferred");
+        expect(completionCallbacks == 0, "completion is deferred");
+
+        pinger->run();
+
+        const std::vector<std::pair<std::size_t, std::size_t>>
+            expectedProgress{{1, 3}, {2, 3}, {3, 3}};
+
+        expect(progress == expectedProgress, "progress continues after exceptions");
+        expect(completionCallbacks == 1, "completion survives progress exceptions");
+        expect(progressAtCompletion == 3, "completion follows final throwing progress");
+        expect(results.size() == targets.size(), "all batch results survive");
+
+        if (results.size() == targets.size())
+        {
+            for (std::size_t i = 0; i < targets.size(); ++i)
+            {
+                expect(
+                    results[i].host == targets[i].host,
+                    "result position survives progress exception");
+                expect(
+                    results[i].status == pings::PingStatus::InvalidOptions,
+                    "result status survives progress exception");
+                expect(!results[i].requestSent, "no request was sent");
+            }
+        }
+
+        pinger->run();
+
+        expect(progress == expectedProgress, "throwing progress is not repeated");
+        expect(completionCallbacks == 1, "completion is not repeated");
+    }
 }
 
 int main()
@@ -129,6 +197,7 @@ int main()
     {
         testEmptyBatch();
         testInvalidOptionsBatch();
+        testProgressCallbackExceptionIsolation();
     }
     catch (const std::exception &error)
     {
