@@ -314,6 +314,16 @@ if(BUILD_TESTING)
     )
 
     pings_add_test(
+        pings_repeat_api_test
+        repeat_api
+        tests/repeat_api_test.cpp
+    )
+
+    set_tests_properties(repeat_api PROPERTIES
+        TIMEOUT 10
+    )
+
+    pings_add_test(
         pings_batch_state_test
         batch_state
         tests/batch_state_test.cpp
